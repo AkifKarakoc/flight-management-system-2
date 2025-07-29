@@ -1,97 +1,82 @@
 import SockJS from 'sockjs-client'
 import { Stomp } from '@stomp/stompjs'
 import { ElMessage } from 'element-plus'
+import { ref } from 'vue'
 
-class WebSocketService {
+const services = {
+  reference: 'http://localhost:8081/ws',
+  flight: 'http://localhost:8082/ws',
+  archive: 'http://localhost:8083/ws'
+}
+
+class WebSocketManager {
   constructor() {
-    this.client = null
-    this.connected = false
-    this.subscriptions = new Map()
+    this.connections = new Map()
+    this.isConnected = ref(false)
   }
 
-  connect() {
-    return new Promise((resolve, reject) => {
-      try {
-        const socket = new SockJS('/ws')
-        this.client = Stomp.over(socket)
+  async connectAll() {
+    const promises = Object.entries(services).map(([name, url]) =>
+        this.connect(name, url)
+    )
+    await Promise.allSettled(promises)
+    this.isConnected.value = true
+    this.setupSubscriptions()
+  }
 
-        this.client.connect(
-          {},
-          () => {
-            this.connected = true
-            console.log('WebSocket connected')
-            resolve()
-          },
-          error => {
-            console.error('WebSocket connection error:', error)
-            reject(error)
-          }
-        )
-      } catch (error) {
-        reject(error)
-      }
+  connect(serviceName, url) {
+    return new Promise((resolve) => {
+      const socket = new SockJS(url)
+      const client = Stomp.over(socket)
+
+      client.connect({}, () => {
+        this.connections.set(serviceName, { client, subscriptions: new Map() })
+        console.log(`${serviceName} connected`)
+        resolve()
+      }, () => resolve())
     })
   }
 
-  subscribe(topic, callback) {
-    if (!this.connected) {
-      console.warn('WebSocket not connected')
-      return
-    }
-
-    const subscription = this.client.subscribe(topic, message => {
-      try {
-        const data = JSON.parse(message.body)
-        callback(data)
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error)
-      }
+  setupSubscriptions() {
+    // Reference updates
+    this.subscribe('reference', '/topic/reference/updates', (data) => {
+      ElMessage.success(`${data.entity || 'Reference'} ${data.type}`)
     })
 
-    this.subscriptions.set(topic, subscription)
-    return subscription
+    // Flight updates
+    this.subscribe('flight', '/topic/flights', (data) => {
+      ElMessage.info(`Flight ${data.flightNumber || ''} ${data.type}`)
+    })
+
+    // Archive updates
+    this.subscribe('archive', '/topic/archive', (data) => {
+      ElMessage.info(`Archive ${data.type}`)
+    })
   }
 
-  unsubscribe(topic) {
-    const subscription = this.subscriptions.get(topic)
-    if (subscription) {
-      subscription.unsubscribe()
-      this.subscriptions.delete(topic)
+  subscribe(service, topic, callback) {
+    const conn = this.connections.get(service)
+    if (conn?.client) {
+      const sub = conn.client.subscribe(topic, msg => {
+        callback(JSON.parse(msg.body))
+      })
+      conn.subscriptions.set(topic, sub)
     }
   }
 
   disconnect() {
-    if (this.client) {
-      this.subscriptions.forEach(sub => sub.unsubscribe())
-      this.subscriptions.clear()
-      this.client.disconnect()
-      this.connected = false
-    }
+    this.connections.forEach(conn => {
+      conn.subscriptions.forEach(sub => sub.unsubscribe())
+      conn.client.disconnect()
+    })
+    this.connections.clear()
+    this.isConnected.value = false
   }
 }
 
-export const wsService = new WebSocketService()
-
-// Composable for easy usage
-export const useWebSocket = () => {
-  const isConnected = ref(false)
-
-  const connect = async () => {
-    try {
-      await wsService.connect()
-      isConnected.value = true
-    } catch (error) {
-      ElMessage.error('WebSocket bağlantısı kurulamadı')
-    }
-  }
-
-  const subscribe = (topic, callback) => wsService.subscribe(topic, callback)
-  const unsubscribe = topic => wsService.unsubscribe(topic)
-
-  onUnmounted(() => {
-    wsService.disconnect()
-    isConnected.value = false
-  })
-
-  return { isConnected, connect, subscribe, unsubscribe }
-}
+export const wsManager = new WebSocketManager()
+export const useWebSocket = () => ({
+  isConnected: wsManager.isConnected,
+  connect: () => wsManager.connectAll(),
+  disconnect: () => wsManager.disconnect()
+})
