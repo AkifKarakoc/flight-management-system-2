@@ -100,8 +100,12 @@ import AppLayout from '@/components/common/AppLayout.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { referenceAPI, flightAPI } from '@/services/api'
 import { useLoading } from '@/utils'
+import { useDashboardStore } from '@/stores/dashboard'
+import { useWebSocket } from '@/services/websocket'
 
 const { loading, withLoading } = useLoading()
+const dashboardStore = useDashboardStore()
+const { isConnected } = useWebSocket()
 
 const stats = reactive({
   totalFlights: 0,
@@ -140,6 +144,12 @@ const loadRecentFlights = async () => {
   }
 }
 
+const updateRecentFlights = () => {
+  if (dashboardStore.flights.length > 0) {
+    recentFlights.value = dashboardStore.flights.slice(0, 4)
+  }
+}
+
 const getStatusType = (status) => {
   const types = {
     'SCHEDULED': 'info',
@@ -151,9 +161,22 @@ const getStatusType = (status) => {
   return types[status] || 'info'
 }
 
+watch(() => dashboardStore.flights, updateRecentFlights, { deep: true })
+
 onMounted(() => {
   withLoading(async () => {
     await Promise.all([loadStats(), loadRecentFlights()])
+
+    if (isConnected.value) {
+      dashboardStore.initWebSocketListeners()
+    } else {
+      const unwatch = watch(isConnected, (connected) => {
+        if (connected) {
+          dashboardStore.initWebSocketListeners()
+          unwatch()
+        }
+      })
+    }
   })
 })
 </script>
