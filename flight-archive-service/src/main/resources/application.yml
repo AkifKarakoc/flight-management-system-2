@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: flight-archive-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/flight_archive_db
+    username: admin
+    password: 123456
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  # Kafka yap?land?rmas? - Basitle?tirilmi?
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: flight-archive-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+server:
+  port: 8083
+  websocket:
+    endpoint: /ws
+    topic-prefix: /topic/archive
+
+# JWT yap?land?rmas?
+jwt:
+  secret: mySecretKey12345678901234567890123456789012345678901234567890
+  expiration: 86400000
+
+# Archive yap?land?rmas?
+archive:
+  retention:
+    days: 365
+  batch:
+    size: 1000
+  kpi:
+    calculation:
+      enabled: true
+      interval: 3600000
+
+# Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.flightmanagement: DEBUG
+    org.springframework.boot: INFO
+    org.springframework.kafka: INFO
+    org.apache.kafka: WARN

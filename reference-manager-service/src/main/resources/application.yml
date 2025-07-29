@@ -1,0 +1,68 @@
+# Actuator configuration ekle
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+spring:
+  application:
+    name: reference-manager-service
+
+    # Jackson JSON serialization ayarları
+    jackson:
+      serialization:
+        write-dates-as-timestamps: false
+      deserialization:
+        fail-on-unknown-properties: false
+      time-zone: UTC
+
+  datasource:
+    url: jdbc:mysql://localhost:3308/reference_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: admin
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  # Liquibase'i aktif edin
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  # Kafka yapılandırması
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: reference-manager-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  port: 8081
+  websocket:
+    endpoint: /ws
+    topic-prefix: /topic/reference
+
+jwt:
+  secret: mySecretKey12345678901234567890123456789012345678901234567890
+  expiration: 86400000
+
+logging:
+  level:
+    com.flightmanagement: DEBUG
+    org.springframework.boot: INFO

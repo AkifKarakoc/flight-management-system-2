@@ -1,0 +1,543 @@
+databaseChangeLog:
+  # ================================
+  # 1. CREATE FLIGHTS TABLE
+  # ================================
+  - changeSet:
+      id: create-flights-table
+      author: flight-management-team
+      comment: "Create flights table with all required columns"
+      changes:
+        - createTable:
+            tableName: flights
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: flight_number
+                  type: VARCHAR(10)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: airline_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: aircraft_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              # Route-based system (NEW)
+              - column:
+                  name: route_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              # Optional airport columns for backward compatibility
+              - column:
+                  name: origin_airport_id
+                  type: BIGINT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: destination_airport_id
+                  type: BIGINT
+                  constraints:
+                    nullable: true
+              # Flight timing
+              - column:
+                  name: flight_date
+                  type: DATE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scheduled_departure
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scheduled_arrival
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: actual_departure
+                  type: TIMESTAMP
+              - column:
+                  name: actual_arrival
+                  type: TIMESTAMP
+              # Flight status and type
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                  defaultValue: 'SCHEDULED'
+              - column:
+                  name: type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+                  defaultValue: 'PASSENGER'
+              # Operational details
+              - column:
+                  name: passenger_count
+                  type: INT
+              - column:
+                  name: cargo_weight
+                  type: INT
+              - column:
+                  name: notes
+                  type: VARCHAR(500)
+              - column:
+                  name: gate_number
+                  type: VARCHAR(10)
+              - column:
+                  name: delay_minutes
+                  type: INT
+              - column:
+                  name: delay_reason
+                  type: VARCHAR(200)
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+              # Connecting flights support
+              - column:
+                  name: parent_flight_id
+                  type: BIGINT
+                  constraints:
+                    nullable: true
+              - column:
+                  name: segment_number
+                  type: INTEGER
+                  defaultValue: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_connecting_flight
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: connection_time_minutes
+                  type: INTEGER
+                  constraints:
+                    nullable: true
+              # Audit columns
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: flights
+
+  # ================================
+  # 2. CREATE FLIGHT_CONNECTIONS TABLE
+  # ================================
+  - changeSet:
+      id: create-flight-connections-table
+      author: flight-management-team
+      comment: "Create flight_connections table for connecting flights"
+      changes:
+        - createTable:
+            tableName: flight_connections
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: main_flight_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: segment_flight_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: segment_order
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: connection_time_minutes
+                  type: INTEGER
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+      rollback:
+        - dropTable:
+            tableName: flight_connections
+
+  # ================================
+  # 3. ADD FOREIGN KEY CONSTRAINTS
+  # ================================
+  - changeSet:
+      id: add-foreign-key-constraints
+      author: flight-management-team
+      comment: "Add foreign key constraints for flight_connections table"
+      changes:
+        - addForeignKeyConstraint:
+            baseTableName: flight_connections
+            baseColumnNames: main_flight_id
+            constraintName: fk_flight_connections_main_flight
+            referencedTableName: flights
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: flight_connections
+            baseColumnNames: segment_flight_id
+            constraintName: fk_flight_connections_segment_flight
+            referencedTableName: flights
+            referencedColumnNames: id
+            onDelete: CASCADE
+            onUpdate: CASCADE
+      rollback:
+        - dropForeignKeyConstraint:
+            baseTableName: flight_connections
+            constraintName: fk_flight_connections_main_flight
+        - dropForeignKeyConstraint:
+            baseTableName: flight_connections
+            constraintName: fk_flight_connections_segment_flight
+
+  # ================================
+  # 4. ADD UNIQUE CONSTRAINTS
+  # ================================
+  - changeSet:
+      id: add-unique-constraints
+      author: flight-management-team
+      comment: "Add unique constraints for data integrity"
+      changes:
+        # Flight table unique constraints
+        - addUniqueConstraint:
+            tableName: flights
+            columnNames: flight_number, flight_date
+            constraintName: uk_flights_number_date
+        # Flight connections unique constraints
+        - addUniqueConstraint:
+            tableName: flight_connections
+            columnNames: main_flight_id, segment_order
+            constraintName: uk_flight_connections_main_segment_order
+        - addUniqueConstraint:
+            tableName: flight_connections
+            columnNames: segment_flight_id
+            constraintName: uk_flight_connections_segment_flight
+      rollback:
+        - dropUniqueConstraint:
+            tableName: flights
+            constraintName: uk_flights_number_date
+        - dropUniqueConstraint:
+            tableName: flight_connections
+            constraintName: uk_flight_connections_main_segment_order
+        - dropUniqueConstraint:
+            tableName: flight_connections
+            constraintName: uk_flight_connections_segment_flight
+
+  # ================================
+  # 5. ADD CHECK CONSTRAINTS
+  # ================================
+  - changeSet:
+      id: add-check-constraints
+      author: flight-management-team
+      comment: "Add check constraints for data validation"
+      changes:
+        - sql:
+            sql: >
+              ALTER TABLE flight_connections 
+              ADD CONSTRAINT chk_flight_connections_segment_order_positive 
+              CHECK (segment_order > 0);
+        - sql:
+            sql: >
+              ALTER TABLE flight_connections 
+              ADD CONSTRAINT chk_flight_connections_connection_time_valid 
+              CHECK (connection_time_minutes IS NULL OR (connection_time_minutes >= 0 AND connection_time_minutes <= 1440));
+        - sql:
+            sql: >
+              ALTER TABLE flights 
+              ADD CONSTRAINT chk_flights_segment_number_positive 
+              CHECK (segment_number > 0);
+        - sql:
+            sql: >
+              ALTER TABLE flights 
+              ADD CONSTRAINT chk_flights_delay_minutes_valid 
+              CHECK (delay_minutes IS NULL OR delay_minutes >= 0);
+
+  # ================================
+  # 6. ADD PERFORMANCE INDEXES
+  # ================================
+  - changeSet:
+      id: add-performance-indexes
+      author: flight-management-team
+      comment: "Add indexes for better query performance"
+      changes:
+        # Basic flight indexes
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_airline_id
+            columns:
+              - column:
+                  name: airline_id
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_aircraft_id
+            columns:
+              - column:
+                  name: aircraft_id
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_flight_date
+            columns:
+              - column:
+                  name: flight_date
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_scheduled_departure
+            columns:
+              - column:
+                  name: scheduled_departure
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_active
+            columns:
+              - column:
+                  name: active
+
+        # Route-based indexes (NEW SYSTEM)
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_route_id
+            columns:
+              - column:
+                  name: route_id
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_route_date
+            columns:
+              - column:
+                  name: route_id
+              - column:
+                  name: flight_date
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_route_status
+            columns:
+              - column:
+                  name: route_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_route_departure
+            columns:
+              - column:
+                  name: route_id
+              - column:
+                  name: scheduled_departure
+
+        # Airport indexes (for backward compatibility)
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_origin_airport_id
+            columns:
+              - column:
+                  name: origin_airport_id
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_destination_airport_id
+            columns:
+              - column:
+                  name: destination_airport_id
+
+        # Connecting flights indexes
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_parent_flight
+            columns:
+              - column:
+                  name: parent_flight_id
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_connecting
+            columns:
+              - column:
+                  name: is_connecting_flight
+
+        # Flight connections indexes
+        - createIndex:
+            tableName: flight_connections
+            indexName: idx_flight_connections_main_flight
+            columns:
+              - column:
+                  name: main_flight_id
+        - createIndex:
+            tableName: flight_connections
+            indexName: idx_flight_connections_segment_flight
+            columns:
+              - column:
+                  name: segment_flight_id
+        - createIndex:
+            tableName: flight_connections
+            indexName: idx_flight_connections_main_order
+            columns:
+              - column:
+                  name: main_flight_id
+              - column:
+                  name: segment_order
+        - createIndex:
+            tableName: flight_connections
+            indexName: idx_flight_connections_segment_order
+            columns:
+              - column:
+                  name: segment_order
+      rollback:
+        # Basic flight indexes rollback
+        - dropIndex:
+            indexName: idx_flights_airline_id
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_aircraft_id
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_flight_date
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_status
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_scheduled_departure
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_active
+            tableName: flights
+        # Route-based indexes rollback
+        - dropIndex:
+            indexName: idx_flights_route_id
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_route_date
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_route_status
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_route_departure
+            tableName: flights
+        # Airport indexes rollback
+        - dropIndex:
+            indexName: idx_flights_origin_airport_id
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_destination_airport_id
+            tableName: flights
+        # Connecting flights indexes rollback
+        - dropIndex:
+            indexName: idx_flights_parent_flight
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_connecting
+            tableName: flights
+        # Flight connections indexes rollback
+        - dropIndex:
+            indexName: idx_flight_connections_main_flight
+            tableName: flight_connections
+        - dropIndex:
+            indexName: idx_flight_connections_segment_flight
+            tableName: flight_connections
+        - dropIndex:
+            indexName: idx_flight_connections_main_order
+            tableName: flight_connections
+        - dropIndex:
+            indexName: idx_flight_connections_segment_order
+            tableName: flight_connections
+
+  # ================================
+  # 7. ADD COMPOSITE INDEXES FOR COMPLEX QUERIES
+  # ================================
+  - changeSet:
+      id: add-composite-indexes
+      author: flight-management-team
+      comment: "Add composite indexes for complex query optimization"
+      changes:
+        # Multi-column performance indexes
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_airline_date_status
+            columns:
+              - column:
+                  name: airline_id
+              - column:
+                  name: flight_date
+              - column:
+                  name: status
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_route_date_status
+            columns:
+              - column:
+                  name: route_id
+              - column:
+                  name: flight_date
+              - column:
+                  name: status
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_type_status_date
+            columns:
+              - column:
+                  name: type
+              - column:
+                  name: status
+              - column:
+                  name: flight_date
+        - createIndex:
+            tableName: flights
+            indexName: idx_flights_active_date_status
+            columns:
+              - column:
+                  name: active
+              - column:
+                  name: flight_date
+              - column:
+                  name: status
+      rollback:
+        - dropIndex:
+            indexName: idx_flights_airline_date_status
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_route_date_status
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_type_status_date
+            tableName: flights
+        - dropIndex:
+            indexName: idx_flights_active_date_status
+            tableName: flights

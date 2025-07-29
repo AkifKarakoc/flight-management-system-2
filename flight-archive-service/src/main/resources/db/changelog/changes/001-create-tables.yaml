@@ -1,0 +1,220 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-flight-archives-table
+      author: flight-management-team
+      comment: "Create flight_archives table"
+      changes:
+        - createTable:
+            tableName: flight_archives
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: event_id
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: event_type
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event_time
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: entity_type
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: entity_id
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: flight_number
+                  type: VARCHAR(10)
+              - column:
+                  name: flight_id
+                  type: BIGINT
+              - column:
+                  name: airline_id
+                  type: BIGINT
+              - column:
+                  name: airline_name
+                  type: VARCHAR(100)
+              - column:
+                  name: airline_iata_code
+                  type: VARCHAR(3)
+              - column:
+                  name: aircraft_id
+                  type: BIGINT
+              - column:
+                  name: aircraft_registration
+                  type: VARCHAR(20)
+              - column:
+                  name: aircraft_type
+                  type: VARCHAR(10)
+              - column:
+                  name: origin_airport_id
+                  type: BIGINT
+              - column:
+                  name: origin_airport_iata
+                  type: VARCHAR(3)
+              - column:
+                  name: origin_airport_name
+                  type: VARCHAR(100)
+              - column:
+                  name: destination_airport_id
+                  type: BIGINT
+              - column:
+                  name: destination_airport_iata
+                  type: VARCHAR(3)
+              - column:
+                  name: destination_airport_name
+                  type: VARCHAR(100)
+              - column:
+                  name: flight_date
+                  type: DATE
+              - column:
+                  name: scheduled_departure
+                  type: TIMESTAMP
+              - column:
+                  name: scheduled_arrival
+                  type: TIMESTAMP
+              - column:
+                  name: actual_departure
+                  type: TIMESTAMP
+              - column:
+                  name: actual_arrival
+                  type: TIMESTAMP
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+              - column:
+                  name: flight_type
+                  type: VARCHAR(20)
+              - column:
+                  name: passenger_count
+                  type: INT
+              - column:
+                  name: cargo_weight
+                  type: INT
+              - column:
+                  name: gate_number
+                  type: VARCHAR(10)
+              - column:
+                  name: delay_minutes
+                  type: INT
+              - column:
+                  name: delay_reason
+                  type: VARCHAR(200)
+              - column:
+                  name: active
+                  type: BOOLEAN
+              - column:
+                  name: payload
+                  type: TEXT
+              - column:
+                  name: version
+                  type: VARCHAR(10)
+              - column:
+                  name: archived_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+      rollback:
+        - dropTable:
+            tableName: flight_archives
+
+  - changeSet:
+      id: add-flight-archives-indexes
+      author: flight-management-team
+      comment: "Add indexes for better query performance"
+      changes:
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_event_id
+            unique: true
+            columns:
+              - column:
+                  name: event_id
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_flight_number_date
+            columns:
+              - column:
+                  name: flight_number
+              - column:
+                  name: flight_date
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_airline_id
+            columns:
+              - column:
+                  name: airline_id
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_flight_date
+            columns:
+              - column:
+                  name: flight_date
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_event_time
+            columns:
+              - column:
+                  name: event_time
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_archived_at
+            columns:
+              - column:
+                  name: archived_at
+        - createIndex:
+            tableName: flight_archives
+            indexName: idx_origin_destination
+            columns:
+              - column:
+                  name: origin_airport_id
+              - column:
+                  name: destination_airport_id
+      rollback:
+        - dropIndex:
+            indexName: idx_event_id
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_flight_number_date
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_airline_id
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_flight_date
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_event_time
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_status
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_archived_at
+            tableName: flight_archives
+        - dropIndex:
+            indexName: idx_origin_destination
+            tableName: flight_archives

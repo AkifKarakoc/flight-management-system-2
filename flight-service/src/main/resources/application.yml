@@ -1,0 +1,237 @@
+spring:
+  application:
+    name: flight-service
+
+  datasource:
+    url: jdbc:mysql://localhost:3308/flight_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: admin
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none  # Liquibase kullanacağız
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+  # Liquibase yapılandırması
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  # Redis yapılandırması
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  # Kafka yapılandırması
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: flight-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.type.mapping: referenceEvent:com.flightmanagement.flightservice.event.ReferenceEvent
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+server:
+  port: 8082
+
+# Enhanced Actuator configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,loggers,threaddump,heapdump,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+    info:
+      enabled: true
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  health:
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+    retries:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        flights.creation.duration: true
+        flights.query.duration: true
+        csv.processing.duration: true
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+        flights.creation.duration: 0.5, 0.95, 0.99
+    tags:
+      application: flight-service
+      environment: ${spring.profiles.active:default}
+      version: 2.0-ROUTE-BASED
+  info:
+    env:
+      enabled: true
+    java:
+      enabled: true
+    os:
+      enabled: true
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        sliding-window-type: count_based
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        permitted-number-of-calls-in-half-open-state: 3
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+        record-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      reference-service:
+        base-config: default
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+      archive-service:
+        base-config: default
+        failure-rate-threshold: 70
+        wait-duration-in-open-state: 20s
+        sliding-window-size: 15
+        minimum-number-of-calls: 8
+  
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.net.ConnectException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      reference-service:
+        base-config: default
+        max-attempts: 2
+        wait-duration: 500ms
+      archive-service:
+        base-config: default
+        max-attempts: 3
+        wait-duration: 1s
+  
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 5s
+        cancel-running-future: true
+    instances:
+      reference-service:
+        base-config: default
+        timeout-duration: 3s
+      archive-service:
+        base-config: default
+        timeout-duration: 10s
+
+# Archive Service Configuration
+archive-service:
+  base-url: http://localhost:8083
+  enabled: true
+  timeout:
+    connect: 5000
+    read: 10000
+  retry:
+    max-attempts: 3
+    delay: 1000
+
+# Metrics Configuration
+metrics:
+  scheduler:
+    enabled: true
+  custom:
+    enabled: true
+
+# WebSocket Configuration
+websocket:
+  endpoint: /ws
+  topic-prefix: /topic/flights
+
+# JWT yapılandırması (Reference Manager ile aynı secret)
+jwt:
+  secret: mySecretKey12345678901234567890123456789012345678901234567890
+  expiration: 86400000
+
+# Reference Manager Service URL
+reference-manager:
+  base-url: http://localhost:8081
+
+# Cache yapılandırması
+cache:
+  ttl:
+    airline: 3600    # 1 saat
+    airport: 3600    # 1 saat
+    aircraft: 1800   # 30 dakika
+
+# Enhanced Logging Configuration
+logging:
+  level:
+    com.flightmanagement: ${LOGGING_LEVEL_FLIGHT:INFO}
+    org.springframework.boot: INFO
+    org.springframework.data.redis: WARN
+    org.springframework.kafka: WARN
+    org.springframework.web.filter.CommonsRequestLoggingFilter: ${REQUEST_LOGGING_LEVEL:DEBUG}
+    io.github.resilience4j: INFO
+    root: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+  file:
+    name: logs/flight-service.log
+    max-size: 10MB
+    max-history: 30
+
+# Production Security Settings
+security:
+  headers:
+    frame-options: DENY
+    content-type-options: nosniff
+    xss-protection: 1; mode=block
+  rate-limit:
+    enabled: true
+    max-requests-per-minute: 100
